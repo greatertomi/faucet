@@ -1,15 +1,31 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.4.22 <0.9.0;
 
-contract Faucet {
+import "./Owned.sol";
+import "./Logger.sol";
+
+contract Faucet is Owned, Logger {
   uint public numOfFunders;
   mapping(address => bool) private funders;
   mapping(uint => address) private lutFunders;
+
+  modifier limitWithdraw(uint withdrawAmount) {
+    require(withdrawAmount <= 100000000000000000, "Cannot withdraw more than 0.1 ether");
+    _;
+  }
 
   // This is called when you make a transaction that doesn't specify function to call.
   // External functions are part of the public interface of the contract.
   // They can be called by via contracts and other transactions.
   receive() external payable {}
+
+  function transferOwnership(address newOwner) external onlyOwner {
+    owner = newOwner;
+  }
+
+  function emitLog() public override pure returns(bytes32) {
+    return "Hello world!";
+  }
 
   function addFunds() external payable {
     address funder = msg.sender;
@@ -32,7 +48,13 @@ contract Faucet {
   function getFunderAtIndex(uint8 index) external view returns(address) {
     return lutFunders[index];
   }
+
+  function withdraw(uint withdrawAmount) external limitWithdraw (withdrawAmount){
+    require(withdrawAmount <= 100000000000000000, "Cannot withdraw more than 0.1 ether");
+    payable(msg.sender).transfer(withdrawAmount);
+  }
 }
 
 // const instance = await Faucet.deployed()
 // instance.addFunds({from: accounts[0], value: "2000000000000000000"})
+// instance.withdraw("500", {from: accounts[0]})
