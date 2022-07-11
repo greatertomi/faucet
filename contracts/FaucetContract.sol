@@ -3,8 +3,9 @@ pragma solidity >=0.4.22 <0.9.0;
 
 import "./Owned.sol";
 import "./Logger.sol";
+import "./IFaucet.sol";
 
-contract Faucet is Owned, Logger {
+contract Faucet is Owned, Logger, IFaucet {
   uint public numOfFunders;
   mapping(address => bool) private funders;
   mapping(uint => address) private lutFunders;
@@ -27,7 +28,7 @@ contract Faucet is Owned, Logger {
     return "Hello world!";
   }
 
-  function addFunds() external payable {
+  function addFunds() override external payable {
     address funder = msg.sender;
 
     if (!funders[funder]) {
@@ -49,7 +50,7 @@ contract Faucet is Owned, Logger {
     return lutFunders[index];
   }
 
-  function withdraw(uint withdrawAmount) external limitWithdraw (withdrawAmount){
+  function withdraw(uint withdrawAmount) override external limitWithdraw (withdrawAmount){
     require(withdrawAmount <= 100000000000000000, "Cannot withdraw more than 0.1 ether");
     payable(msg.sender).transfer(withdrawAmount);
   }
@@ -57,4 +58,4 @@ contract Faucet is Owned, Logger {
 
 // const instance = await Faucet.deployed()
 // instance.addFunds({from: accounts[0], value: "2000000000000000000"})
-// instance.withdraw("500", {from: accounts[0]})
+// instance.withdraw("90000000000000000", {from: accounts[0]})
