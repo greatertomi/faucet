@@ -1,11 +1,24 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import "./App.css";
 import Web3 from "web3";
-import {loadContract} from "./utils/load-contract";
+import { loadContract } from "./utils/load-contract";
 
 const App = () => {
-  const [web3Api, setWeb3Api] = useState({ provider: null, web3: null, contract: null });
+  const [web3Api, setWeb3Api] = useState({
+    provider: null,
+    web3: null,
+    contract: null,
+  });
   const [account, setAccount] = useState(null);
+  const [balance, setBalance] = useState(null);
+  const [shouldReload, reload] = useState(false);
+
+  const reloadEffect = useCallback(() => reload(!shouldReload), [shouldReload]);
+
+  const setAccountListener = (provider) => {
+    provider.on("accountsChanged", (_) => window.location.reload());
+    provider.on("chainChanged", (_) => window.location.reload());
+  };
 
   useEffect(() => {
     const loadProvider = async () => {
@@ -22,11 +35,16 @@ const App = () => {
           provider = new Web3.providers.HttpProvider("http://localhost:7545");
         }
 
-        setWeb3Api({
-          web3: new Web3(provider),
-          provider,
-        });
+        setAccountListener(provider);
+        const web3 = new Web3(provider);
 
+        const contract = await loadContract("Faucet", web3);
+
+        setWeb3Api({
+          web3,
+          provider,
+          contract,
+        });
       } catch (err) {
         console.error(err);
       }
@@ -35,14 +53,13 @@ const App = () => {
   }, []);
 
   useEffect(() => {
-    const initiateContract = async () => {
-      const contract = await loadContract("Faucet", web3Api.web3);
-      console.log(contract)
-      setWeb3Api({...web3Api, contract})
-    }
-    initiateContract();
-  }, [web3Api, web3Api.web3])
-
+    const loadBalance = async () => {
+      const { contract, web3 } = web3Api;
+      const balance = await web3.eth.getBalance(contract._address);
+      setBalance(web3.utils.fromWei(balance, "ether"));
+    };
+    web3Api.contract && loadBalance();
+  }, [web3Api, shouldReload]);
 
   useEffect(() => {
     const getAccount = async () => {
@@ -51,6 +68,24 @@ const App = () => {
     };
     web3Api.web3 && getAccount();
   }, [web3Api.web3]);
+
+  const addFunds = useCallback(async () => {
+    const { contract, web3 } = web3Api;
+    await contract.methods.addFunds().send({
+      from: account,
+      value: web3.utils.toWei("1", "ether"),
+    });
+    reloadEffect();
+  }, [web3Api, account, reloadEffect]);
+
+  const withdraw = useCallback(async () => {
+    const { contract, web3 } = web3Api;
+    const withdrawAmount = web3.utils.toWei("0.1", "ether");
+    await contract.methods.withdraw(withdrawAmount).send({
+      from: account,
+    });
+    reloadEffect();
+  }, [account, reloadEffect, web3Api]);
 
   return (
     <>
@@ -66,7 +101,6 @@ const App = () => {
               <button
                 className="button is-small"
                 onClick={() => {
-                  console.log("Connecting");
                   web3Api.provider.request({ method: "eth_requestAccounts" });
                 }}
               >
@@ -75,10 +109,14 @@ const App = () => {
             )}
           </div>
           <div className="balance-view is-size-2">
-            Current Balance: <strong>10</strong> ETH
+            Current Balance: <strong>{balance}</strong> ETH
           </div>
-          <button className="button is-primary mr-2">Donate</button>
-          <button className="button is-link">Withdraw</button>
+          <button className="button is-primary mr-2" onClick={addFunds}>
+            Donate 1 eth
+          </button>
+          <button className="button is-link" onClick={withdraw}>
+            Withdraw
+          </button>
         </div>
       </div>
     </>
